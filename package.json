@@ -1,0 +1,23 @@
+{
+  "name": "week-4-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "app.js",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "joi": "^18.1.2"
+  },
+  "devDependencies": {
+    "dotenv": "^17.4.2",
+    "nodemon": "^3.1.14"
+  }
+}
