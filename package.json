@@ -10,11 +10,12 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "app.js",
+  "type": "commonjs",
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1",
-    "joi": "^18.1.2"
+    "joi": "^18.1.2",
+    "mongoose": "^9.5.0"
   },
   "devDependencies": {
     "dotenv": "^17.4.2",

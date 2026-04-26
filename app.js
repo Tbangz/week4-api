@@ -1,7 +1,9 @@
 require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const Joi = require('joi');
+const mongoose = require('mongoose');
 
 const app = express();
 
@@ -22,11 +24,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// In-Memory Data
-let todos = [
-  { id: 1, task: 'Finish Week 4 slides', completed: false },
-  { id: 2, task: 'Deploy API (today!)', completed: true },
-];
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('✅ MongoDB Connected'))
+  .catch(err => {
+    console.error('❌ MongoDB Connection Error:', err);
+    process.exit(1);
+  });
+
 
 // 2. Validation Schema using Joi
 const todoSchema = Joi.object({
@@ -52,9 +56,31 @@ const validateTodo = (req, res, next) => {
   next();
 };
 
+const todoSchemaMongoose = new mongoose.Schema({
+  task: {
+    type: String,
+    required: true,
+    minlength: 3,
+    trim: true
+  },
+  completed: {
+    type: Boolean,
+    default: false
+  }
+}, { timestamps: true });
+
+const Todo = mongoose.model('Todo', todoSchemaMongoose); // ✅ THIS LINE FIXES YOUR ERROR
+
 // GET ALL Todos
-app.get('/todos', (req, res, next) => {
+app.get('/todos', async (req, res, next) => {
   try {
+    const filter = {};
+
+    if (req.query.completed !== undefined) {
+      filter.completed = req.query.completed === 'true';
+    }
+
+    const todos = await Todo.find(filter);
     res.status(200).json(todos);
   } catch (err) {
     next(err);
@@ -62,79 +88,65 @@ app.get('/todos', (req, res, next) => {
 });
 
 // POST New Todo
-app.post('/todos', validateTodo, (req, res, next) => {
+app.post('/todos', validateTodo, async (req, res, next) => {
   try {
-    const { task } = req.body;
-    
-    const newTodo = {
-      id: todos.length + 1,
-      task: task.trim(),
-      completed: false
-    };
-    
-    todos.push(newTodo);
-    res.status(201).json(newTodo);
+    const todo = new Todo({
+      task: req.body.task
+    });
+
+    const saved = await todo.save();
+    res.status(201).json(saved);
   } catch (err) {
     next(err);
   }
 });
 
 // GET One Todo
-app.get('/todos/:id', (req, res, next) => {
+app.get('/todos', async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid ID format' });
+    const filter = {};
+
+    if (req.query.completed !== undefined) {
+      filter.completed = req.query.completed === 'true';
     }
 
-    const todo = todos.find((t) => t.id === id);
-    if (!todo) {
-      return res.status(404).json({ error: 'Todo not found' });
-    }
-
-    res.status(200).json(todo);
+    const todos = await Todo.find(filter);
+    res.status(200).json(todos);
   } catch (err) {
     next(err);
   }
 });
 
 // PATCH Update Todo
-app.patch('/todos/:id', validateTodo, (req, res, next) => {
+app.patch('/todos/:id', async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid ID format' });
-    }
+    const updates = {};
 
-    const todo = todos.find((t) => t.id === id);
-    if (!todo) {
+    if (req.body.task !== undefined) updates.task = req.body.task;
+    if (req.body.completed !== undefined) updates.completed = req.body.completed;
+
+    const updated = await Todo.findByIdAndUpdate(
+      req.params.id,
+      updates,
+      { new: true, runValidators: true }
+    );
+
+    if (!updated) {
       return res.status(404).json({ error: 'Todo not found' });
     }
 
-    // Only allow updating task and/or completed
-    const updates = {};
-    if (req.body.task !== undefined) updates.task = req.body.task.trim();
-    if (req.body.completed !== undefined) updates.completed = req.body.completed;
-
-    Object.assign(todo, updates);
-    res.status(200).json(todo);
+    res.json(updated);
   } catch (err) {
     next(err);
   }
 });
 
 // DELETE Todo
-app.delete('/todos/:id', (req, res, next) => {
+app.delete('/todos/:id', async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid ID format' });
-    }
+    const deleted = await Todo.findByIdAndDelete(req.params.id);
 
-    const lenBefore = todos.length;
-    todos = todos.filter((t) => t.id !== id);
-
-    if (todos.length === lenBefore) {
+    if (!deleted) {
       return res.status(404).json({ error: 'Todo not found' });
     }
 
